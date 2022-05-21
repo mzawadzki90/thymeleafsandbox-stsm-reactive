@@ -1,20 +1,20 @@
 /*
  * =============================================================================
- * 
+ *
  *   Copyright (c) 2011-2016, The THYMELEAF team (http://www.thymeleaf.org)
- * 
+ *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
  *   You may obtain a copy of the License at
- * 
+ *
  *       http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  *   Unless required by applicable law or agreed to in writing, software
  *   distributed under the License is distributed on an "AS IS" BASIS,
  *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
- * 
+ *
  * =============================================================================
  */
 package thymeleafsandbox.stsm.web.controller;
@@ -22,7 +22,7 @@ package thymeleafsandbox.stsm.web.controller;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
-
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -40,56 +40,46 @@ import thymeleafsandbox.stsm.business.entities.Variety;
 import thymeleafsandbox.stsm.business.services.SeedStarterService;
 import thymeleafsandbox.stsm.business.services.VarietyService;
 
-
 @Controller
-@SessionAttributes({"allFeatures"})
+@SessionAttributes({ "allFeatures" })
 public class SeedStarterMngController {
-
 
     private VarietyService varietyService;
     private SeedStarterService seedStarterService;
-    
-    
-    
+
     public SeedStarterMngController() {
         super();
     }
-
 
     @Autowired
     public void setVarietyService(final VarietyService varietyService) {
         this.varietyService = varietyService;
     }
 
-
     @Autowired
     public void setSeedStarterService(final SeedStarterService seedStarterService) {
         this.seedStarterService = seedStarterService;
     }
 
-
-
-
     @ModelAttribute("allTypes")
     public List<Type> populateTypes() {
         return Arrays.asList(Type.ALL);
     }
-    
+
     @ModelAttribute("allFeatures")
     public List<Feature> populateFeatures() {
         return Arrays.asList(Feature.ALL);
     }
-    
+
     @ModelAttribute("allVarieties")
     public Flux<Variety> populateVarieties() {
         return this.varietyService.findAll();
     }
-    
+
     @ModelAttribute("allSeedStarters")
     public Flux<SeedStarter> populateSeedStarters() {
         return this.seedStarterService.findAll();
     }
-
 
     /*
      * NOTE that in this reactive version of STSM we cannot select the controller method to be executed
@@ -108,33 +98,31 @@ public class SeedStarterMngController {
      * coming from the client.
      */
 
-    @RequestMapping({"/","/seedstartermng"})
-    public Mono<String> doSeedstarter(
-            final SeedStarter seedStarter, final BindingResult bindingResult, final ServerWebExchange exchange) {
+    @RequestMapping({ "/", "/seedstartermng" })
+    public Mono<String> doSeedstarter(final SeedStarter seedStarter, final BindingResult bindingResult, final ServerWebExchange exchange) {
 
-        return exchange.getFormData().flatMap(
-                formData -> {
-                    if (formData.containsKey("save")) {
-                        return saveSeedstarter(seedStarter,  bindingResult);
-                    }
-                    if (formData.containsKey("addRow")) {
-                        return addRow(seedStarter, bindingResult);
-                    }
-                    if (formData.containsKey("removeRow")) {
-                        final int rowId = Integer.parseInt(formData.getFirst("removeRow"));
-                        return removeRow(seedStarter, bindingResult, rowId);
-                    }
-                    return showSeedstarters(seedStarter);
-                });
+        return exchange.getFormData().flatMap(formData -> {
+            if (formData.containsKey("save")) {
+                return saveSeedstarter(seedStarter, bindingResult);
+            }
+            if (formData.containsKey("addRow")) {
+                return addRow(seedStarter, bindingResult);
+            }
+            if (formData.containsKey("removeRow")) {
+                final Optional<Integer> optionalRowId = Optional.ofNullable(formData.getFirst("removeRow")).map(Integer::parseInt);
+                if(optionalRowId.isPresent()) {
+                    return removeRow(seedStarter, bindingResult, optionalRowId.get());
+                }
+            }
+            return showSeedstarters(seedStarter);
+        });
 
     }
-
 
     private Mono<String> showSeedstarters(final SeedStarter seedStarter) {
         seedStarter.setDatePlanted(Calendar.getInstance().getTime());
         return Mono.just("seedstartermng");
     }
-
 
     private Mono<String> saveSeedstarter(final SeedStarter seedStarter, final BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
@@ -143,21 +131,14 @@ public class SeedStarterMngController {
         return this.seedStarterService.add(seedStarter).then(Mono.just("redirect:/seedstartermng"));
     }
 
-
     private Mono<String> addRow(final SeedStarter seedStarter, final BindingResult bindingResult) {
         seedStarter.getRows().add(new Row());
         return Mono.just("seedstartermng");
     }
-    
-    
-    private Mono<String> removeRow(
-            final SeedStarter seedStarter,
-            final BindingResult bindingResult,
-            final int rowId) {
+
+    private Mono<String> removeRow(final SeedStarter seedStarter, final BindingResult bindingResult, final int rowId) {
         seedStarter.getRows().remove(rowId);
         return Mono.just("seedstartermng");
     }
-
-
 
 }
